@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>以太网最小生成树布网模拟</title>
+    <style>body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f0f0f0;
+    }
+    
+    h1, h2 {
+        color: #333;
+    }
+    
+    div {
+        margin-bottom: 20px;
+        background-color: white;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    textarea {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 5px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+    }
+    
+    button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    
+    button:hover {
+        background-color: #45a049;
+    }
+    
+    canvas {
+        border: 1px solid #ddd;
+        background-color: white;
+    }
+    
+    p {
+        font-weight: bold;
+    }
+    
+    #primWeight, #kruskalWeight {
+        color: #4CAF50;
+    }
+    </style>
+</head>
+<body>
+    <h1>以太网最小生成树布网模拟</h1>
+    
+    <input type="file" id="fileInput" accept=".txt">
+    
+    <div>
+        <h2>原始网络图</h2>
+        <canvas id="originalGraph" width="400" height="400"></canvas>
+    </div>
+
+    <div>
+        <h2>Prim算法结果</h2>
+        <canvas id="primGraph" width="400" height="400"></canvas>
+        <p>总权重: <span id="primWeight"></span></p>
+    </div>
+
+    <div>
+        <h2>Kruskal算法结果</h2>
+        <canvas id="kruskalGraph" width="400" height="400"></canvas>
+        <p>总权重: <span id="kruskalWeight"></span></p>
+    </div>
+
+    <script>
+        // 全局变量
+        let computers = [];
+        let network = [];
+        let primResult = [];
+        let kruskalResult = [];
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processFileContent(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function processFileContent(content) {
+            const lines = content.split('\n');
+            let lineIndex = 0;
+
+            // 读取计算机信息
+            const n = parseInt(lines[lineIndex++]);
+            computers = [];
+            for (let i = 0; i < n; i++) {
+                const [name, location] = lines[lineIndex++].split(' ');
+                computers.push({ name, location });
+            }
+
+            // 读取网络信息
+            network = [];
+            for (let i = 0; i < n; i++) {
+                network.push(lines[lineIndex++].split(' ').map(Number));
+            }
+
+            // 读取Prim结果
+            lineIndex++; // 跳过 "Prim" 行
+            primResult = [];
+            while (!lines[lineIndex].startsWith("PrimTotalWeight")) {
+                const [from, to, weight] = lines[lineIndex++].split(' ').map(Number);
+                primResult.push({ from, to, weight });
+            }
+            const primTotalWeight = parseInt(lines[lineIndex++].split(' ')[1]);
+
+            // 读取Kruskal结果
+            lineIndex++; // 跳过 "Kruskal" 行
+            kruskalResult = [];
+            while (!lines[lineIndex].startsWith("KruskalTotalWeight")) {
+                const [from, to, weight] = lines[lineIndex++].split(' ').map(Number);
+                kruskalResult.push({ from, to, weight });
+            }
+            const kruskalTotalWeight = parseInt(lines[lineIndex].split(' ')[1]);
+
+            // 绘制图形
+            drawGraph('originalGraph', [], true);
+            drawGraph('primGraph', primResult);
+            drawGraph('kruskalGraph', kruskalResult);
+
+            // 显示总权重
+            document.getElementById('primWeight').textContent = primTotalWeight;
+            document.getElementById('kruskalWeight').textContent = kruskalTotalWeight;
+        }
+        
+        function drawGraph(canvasId, edges, showAllEdges = false) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const n = computers.length;
+            const radius = 150;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // 绘制节点和地址
+            for (let i = 0; i < n; i++) {
+                const angle = (i / n) * 2 * Math.PI;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                
+                // 绘制节点
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                ctx.fillStyle = 'lightblue';
+                ctx.fill();
+                ctx.stroke();
+
+                // 绘制计算机名
+                ctx.fillStyle = 'black';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = '12px Arial';
+                ctx.fillText(computers[i].name, x, y);
+
+                // 绘制地址框
+                const addressWidth = 80;
+                const addressHeight = 20;
+                const addressX = x + 30;
+                const addressY = y - 30;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(addressX, addressY, addressWidth, addressHeight);
+                ctx.strokeRect(addressX, addressY, addressWidth, addressHeight);
+
+                // 绘制地址文本
+                ctx.fillStyle = 'black';
+                ctx.textAlign = 'left';
+                ctx.font = '10px Arial';
+                ctx.fillText(computers[i].location, addressX + 2, addressY + addressHeight / 2);
+            }
+
+            // 绘制边
+            if (showAllEdges) {
+                // 为原始网络图绘制所有非零权重的边
+                for (let i = 0; i < n; i++) {
+                    for (let j = i + 1; j < n; j++) {
+                        if (network[i][j] > 0) {
+                            drawEdge(ctx, i, j, n, radius, centerX, centerY, network[i][j]);
+                        }
+                    }
+                }
+            } else {
+                // 为最小生成树绘制边
+                edges.forEach(edge => {
+                    drawEdge(ctx, edge.from, edge.to, n, radius, centerX, centerY, edge.weight);
+                });
+            }
+        }
+
+        function drawEdge(ctx, from, to, n, radius, centerX, centerY, weight) {
+            const fromAngle = (from / n) * 2 * Math.PI;
+            const toAngle = (to / n) * 2 * Math.PI;
+            const fromX = centerX + radius * Math.cos(fromAngle);
+            const fromY = centerY + radius * Math.sin(fromAngle);
+            const toX = centerX + radius * Math.cos(toAngle);
+            const toY = centerY + radius * Math.sin(toAngle);
+
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            // 在边的中点显示权重
+            const midX = (fromX + toX) / 2;
+            const midY = (fromY + toY) / 2;
+            ctx.fillStyle = 'red';
+            ctx.font = '12px Arial';
+            ctx.fillText(weight, midX, midY);
+        }
+    </script>
+</body>
+</html>
